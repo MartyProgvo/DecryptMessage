@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AES Dekryptering</title>
+</head>
+<body>
+    <h1>AES Dekryptering</h1>
+    
+    <label for="encryptedMessage">Krypterat meddelande (Base64):</label><br>
+    <input type="text" id="encryptedMessage" style="width: 400px;" placeholder="Meddelande"><br><br>
+
+    <label for="key">Nyckel:</label><br>
+    <input type="text" id="key" style="width: 400px;" placeholder="Nyckel i vanlig text"><br><br>
+
+    <button id="decryptButton">Dekryptera</button>
+    <h2 id="result"></h2>
+
+    <script>
+        async function sha256(message) {
+            // Skapa en Uint8Array från meddelandet
+            const msgBuffer = new TextEncoder().encode(message); // Använder standard TextEncoder för att hantera strängar
+            // Hasha meddelandet
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+            // Konvertera hash till byte-array
+            return new Uint8Array(hashBuffer);
+        }
+
+        async function decryptMessage(encryptedMessage, key) {
+            // Hasha nyckeln med SHA-256
+            const keyBuffer = await sha256(key);
+            const cryptoKey = await window.crypto.subtle.importKey('raw', keyBuffer, 'AES-CBC', false, ['decrypt']);
+
+            // Konvertera det krypterade meddelandet från Base64 till ArrayBuffer
+            const encryptedBuffer = Uint8Array.from(atob(encryptedMessage), c => c.charCodeAt(0));
+            
+            // Extrahera IV från det krypterade meddelandet
+            const iv = encryptedBuffer.slice(0, 16); // De första 16 byte är IV
+            const data = encryptedBuffer.slice(16); // Resterande är det faktiska krypterade meddelandet
+
+            try {
+                // Dekryptera meddelandet
+                const decrypted = await window.crypto.subtle.decrypt(
+                    {
+                        name: 'AES-CBC',
+                        iv: iv
+                    },
+                    cryptoKey,
+                    data
+                );
+
+                // Omvandla ArrayBuffer till text
+                const decoder = new TextDecoder(); // Standard dekodare för UTF-8/UTF-16
+                return decoder.decode(decrypted);
+            } catch (e) {
+                console.error('Dekryptering misslyckades:', e);
+                return null;
+            }
+        }
+
+        document.getElementById('decryptButton').addEventListener('click', async () => {
+            const encryptedMessage = document.getElementById('encryptedMessage').value;
+            const key = document.getElementById('key').value;
+
+            try {
+                const result = await decryptMessage(encryptedMessage, key);
+                if (result) {
+                    document.getElementById('result').innerText = 'Dekrypterat meddelande: ' + result;
+                } else {
+                    document.getElementById('result').innerText = 'Dekryptering misslyckades!';
+                }
+            } catch (error) {
+                document.getElementById('result').innerText = error.message;
+            }
+        });
+    </script>
+</body>
+</html>
